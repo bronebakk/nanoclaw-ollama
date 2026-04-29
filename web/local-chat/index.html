@@ -96,6 +96,47 @@
         color: var(--agent-fg);
         border-bottom-left-radius: 4px;
       }
+      .card {
+        align-self: flex-start;
+        max-width: 80%;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .card .card-title {
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .card .card-question {
+        font-size: 14px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      .card .card-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .card button {
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .card button.secondary {
+        background: var(--agent-bg);
+        color: var(--agent-fg);
+      }
+      .card button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
       .empty {
         color: var(--muted);
         text-align: center;
@@ -196,15 +237,81 @@
         $statusText.textContent = ok ? 'connected' : 'offline';
       }
 
+      function clearEmpty() {
+        const empty = document.getElementById('empty');
+        if (empty) empty.remove();
+      }
+
       function addMessage(text, who) {
-        if ($empty) {
-          $empty.remove();
-        }
+        clearEmpty();
         const div = document.createElement('div');
         div.className = `msg ${who}`;
         div.textContent = text;
         $messages.appendChild(div);
         $messages.scrollTop = $messages.scrollHeight;
+      }
+
+      function addCard(question) {
+        clearEmpty();
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.questionId = question.questionId;
+
+        const title = document.createElement('div');
+        title.className = 'card-title';
+        title.textContent = question.title;
+        card.appendChild(title);
+
+        const body = document.createElement('div');
+        body.className = 'card-question';
+        body.textContent = question.question;
+        card.appendChild(body);
+
+        const opts = document.createElement('div');
+        opts.className = 'card-options';
+        question.options.forEach((opt, i) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          // First option (index 0) is the primary/affirmative — match
+          // chat-sdk-bridge's "Approve = primary, Reject = secondary"
+          // visual ordering. For non-approval ask_question with N options
+          // the first is treated as the primary choice.
+          if (i > 0) btn.classList.add('secondary');
+          btn.textContent = opt.label;
+          btn.addEventListener('click', () => submitAction(card, question, opt));
+          opts.appendChild(btn);
+        });
+        card.appendChild(opts);
+
+        $messages.appendChild(card);
+        $messages.scrollTop = $messages.scrollHeight;
+      }
+
+      async function submitAction(cardEl, question, option) {
+        // Optimistic update — disable buttons, replace card body with the
+        // selectedLabel — so there's no flash of clickable buttons before
+        // the next poll catches up. The server also rewrites the buffered
+        // entry so a tab reload sees the answered state.
+        const buttons = cardEl.querySelectorAll('button');
+        buttons.forEach((b) => (b.disabled = true));
+        cardEl.querySelector('.card-question').textContent = option.selectedLabel;
+        cardEl.querySelector('.card-options').remove();
+
+        try {
+          const res = await fetch('/api/actions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questionId: question.questionId, value: option.value }),
+          });
+          if (!res.ok) {
+            const body = await res.text();
+            cardEl.querySelector('.card-question').textContent =
+              `[error: ${res.status} ${body}]`;
+          }
+        } catch (err) {
+          cardEl.querySelector('.card-question').textContent =
+            `[network error: ${err.message}]`;
+        }
       }
 
       async function poll() {
@@ -214,7 +321,14 @@
           const data = await res.json();
           setOnline(true);
           for (const m of data.messages || []) {
-            addMessage(m.text, 'agent');
+            if (m.kind === 'question') {
+              // Skip if we've already rendered this question id (e.g. it's
+              // re-arriving after a polling race with the action submit).
+              if (document.querySelector(`[data-question-id="${m.questionId}"]`)) continue;
+              addCard(m);
+            } else {
+              addMessage(m.text, 'agent');
+            }
           }
           if (typeof data.cursor === 'number') cursor = data.cursor;
         } catch (err) {
