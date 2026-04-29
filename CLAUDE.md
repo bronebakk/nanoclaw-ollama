@@ -77,6 +77,7 @@ Exactly one writer per file — no cross-mount lock contention. Heartbeat is a f
 | `container/skills/` | Container skills mounted into every agent session |
 | `groups/<folder>/` | Per-agent-group filesystem (CLAUDE.md, skills, per-group `agent-runner-src/` overlay) |
 | `scripts/init-first-agent.ts` | Bootstrap the first DM-wired agent (used by `/init-first-agent` skill) |
+| `scripts/init-local-chat.ts` | Wire the local-http browser channel to an agent group (used by `/init-local-chat` skill) |
 
 ## Channels and Providers (skill-installed)
 
@@ -140,13 +141,14 @@ Four types of skills. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full taxono
 
 - **Channel/provider install skills** — copy the relevant module(s) in from the `channels` or `providers` branch, wire imports, install pinned deps (e.g. `/add-discord`, `/add-slack`, `/add-whatsapp`, `/add-opencode`).
 - **Utility skills** — ship code files alongside `SKILL.md` (e.g. `/claw`).
-- **Operational skills** — instruction-only workflows (`/setup`, `/debug`, `/customize`, `/init-first-agent`, `/manage-channels`, `/init-onecli`, `/update-nanoclaw`).
+- **Operational skills** — instruction-only workflows (`/setup`, `/debug`, `/customize`, `/init-first-agent`, `/init-local-chat`, `/manage-channels`, `/init-onecli`, `/update-nanoclaw`).
 - **Container skills** — loaded inside agent containers at runtime (`container/skills/`: `welcome`, `self-customize`, `agent-browser`, `slack-formatting`).
 
 | Skill | When to Use |
 |-------|-------------|
 | `/setup` | First-time install, auth, service config |
 | `/init-first-agent` | Bootstrap the first DM-wired agent (channel pick → identity → wire → welcome DM) |
+| `/init-local-chat` | Wire the local-http browser channel for a non-technical user (pairs with `/add-ollama-provider`) |
 | `/manage-channels` | Wire channels to agent groups with isolation level decisions |
 | `/customize` | Adding channels, integrations, behavior changes |
 | `/debug` | Container issues, logs, troubleshooting |
