@@ -1,0 +1,29 @@
+[package]
+name = "nanoclaw-desktop"
+version = "0.1.0"
+description = "Tauri shell that loads the NanoClaw local-http chat at 127.0.0.1:3030"
+authors = ["NanoClaw"]
+edition = "2021"
+rust-version = "1.77"
+
+# Empty lib stanza so cargo doesn't auto-detect src/lib.rs and we keep
+# the binary entry point as the only build target.
+[lib]
+name = "nanoclaw_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+incremental = false
+opt-level = "s"
+strip = true

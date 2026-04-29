@@ -76,6 +76,7 @@ Exactly one writer per file — no cross-mount lock contention. Heartbeat is a f
 | `container/agent-runner/src/` | Agent-runner: poll loop, formatter, provider abstraction, MCP tools, destinations |
 | `container/skills/` | Container skills mounted into every agent session |
 | `groups/<folder>/` | Per-agent-group filesystem (CLAUDE.md, skills, per-group `agent-runner-src/` overlay) |
+| `desktop/` | Optional Tauri 2 wrapper around the local-http channel — bundles the SPA into a native `.app`/`.exe`/`.AppImage`. See `desktop/README.md`. |
 | `scripts/init-first-agent.ts` | Bootstrap the first DM-wired agent (used by `/init-first-agent` skill) |
 | `scripts/init-local-chat.ts` | Wire the local-http browser channel to an agent group (used by `/init-local-chat` skill) |
 
