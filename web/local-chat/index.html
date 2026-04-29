@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NanoClaw — Local Chat</title>
+    <style>
+      :root {
+        --bg: #f7f7f8;
+        --panel: #ffffff;
+        --border: #e5e5e7;
+        --text: #1a1a1a;
+        --muted: #6b7280;
+        --accent: #2563eb;
+        --you-bg: #2563eb;
+        --you-fg: #ffffff;
+        --agent-bg: #ececef;
+        --agent-fg: #1a1a1a;
+        --status-ok: #16a34a;
+        --status-bad: #dc2626;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #18181b;
+          --panel: #1f1f23;
+          --border: #2e2e35;
+          --text: #ececec;
+          --muted: #9ca3af;
+          --agent-bg: #2a2a31;
+          --agent-fg: #ececec;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+      header h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+      }
+      header .badges {
+        display: inline-flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      header .badge {
+        font-size: 11px;
+        font-weight: 500;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--agent-bg);
+        color: var(--agent-fg);
+        white-space: nowrap;
+      }
+      header .badge.local {
+        background: rgba(22, 163, 74, 0.15);
+        color: var(--status-ok);
+      }
+      header .badge.cloud {
+        background: rgba(37, 99, 235, 0.15);
+        color: var(--accent);
+      }
+      header .badge.locked {
+        background: rgba(22, 163, 74, 0.15);
+        color: var(--status-ok);
+      }
+      header .badge.unconfigured {
+        background: rgba(220, 38, 38, 0.15);
+        color: var(--status-bad);
+      }
+      header .badge.warn {
+        background: rgba(217, 119, 6, 0.15);
+        color: #d97706;
+      }
+      @media (prefers-color-scheme: dark) {
+        header .badge.warn { color: #fbbf24; }
+      }
+      header .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--muted);
+        margin-left: auto;
+      }
+      header .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--status-bad);
+      }
+      header .dot.ok { background: var(--status-ok); }
+      main {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .msg {
+        max-width: 80%;
+        padding: 10px 14px;
+        border-radius: 14px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        line-height: 1.45;
+      }
+      .msg.you {
+        align-self: flex-end;
+        background: var(--you-bg);
+        color: var(--you-fg);
+        border-bottom-right-radius: 4px;
+      }
+      .msg.agent {
+        align-self: flex-start;
+        background: var(--agent-bg);
+        color: var(--agent-fg);
+        border-bottom-left-radius: 4px;
+      }
+      .card {
+        align-self: flex-start;
+        max-width: 80%;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .card .card-title {
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .card .card-question {
+        font-size: 14px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      .card .card-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .card button {
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .card button.secondary {
+        background: var(--agent-bg);
+        color: var(--agent-fg);
+      }
+      .card button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .empty {
+        color: var(--muted);
+        text-align: center;
+        margin: auto;
+        font-size: 14px;
+      }
+      footer {
+        padding: 12px 16px;
+        background: var(--panel);
+        border-top: 1px solid var(--border);
+      }
+      .composer {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+      }
+      textarea {
+        flex: 1;
+        resize: none;
+        min-height: 44px;
+        max-height: 160px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font: inherit;
+        background: var(--bg);
+        color: var(--text);
+      }
+      textarea:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: -1px;
+      }
+      button {
+        padding: 10px 16px;
+        background: var(--accent);
+        color: white;
+        border: 0;
+        border-radius: 10px;
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .hint {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 6px;
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 id="title">NanoClaw</h1>
+      <div class="badges" id="badges"></div>
+      <span class="status">
+        <span id="dot" class="dot"></span>
+        <span id="status-text">connecting…</span>
+      </span>
+    </header>
+
+    <main id="messages">
+      <div class="empty" id="empty">Send a message to start.</div>
+    </main>
+
+    <footer>
+      <form class="composer" id="composer">
+        <textarea
+          id="input"
+          placeholder="Message…"
+          autocomplete="off"
+          autofocus
+          rows="1"
+        ></textarea>
+        <button type="submit" id="send">Send</button>
+      </form>
+      <div class="hint">Enter to send · Shift+Enter for newline</div>
+    </footer>
+
+    <script>
+      const $messages = document.getElementById('messages');
+      const $empty = document.getElementById('empty');
+      const $form = document.getElementById('composer');
+      const $input = document.getElementById('input');
+      const $send = document.getElementById('send');
+      const $dot = document.getElementById('dot');
+      const $statusText = document.getElementById('status-text');
+      const $badges = document.getElementById('badges');
+      const $title = document.getElementById('title');
+
+      let cursor = 0;
+      let online = false;
+
+      function setOnline(ok) {
+        if (ok === online) return;
+        online = ok;
+        $dot.classList.toggle('ok', ok);
+        $statusText.textContent = ok ? 'connected' : 'offline';
+        // Refresh the badges on every reconnect — the operator may have
+        // re-run /add-ollama-provider or edited container.json while the
+        // SPA was offline.
+        if (ok) refreshInfo();
+      }
+
+      async function refreshInfo() {
+        try {
+          const res = await fetch('/api/info', { cache: 'no-store' });
+          if (!res.ok) return;
+          const info = await res.json();
+          renderBadges(info);
+        } catch {
+          // Non-fatal — leave the existing badges in place.
+        }
+      }
+
+      function renderBadges(info) {
+        $badges.innerHTML = '';
+        const provider = info.provider;
+        const egress = info.egress;
+        const agent = info.agent;
+
+        if (agent && agent.name) {
+          $title.textContent = agent.name;
+        }
+
+        if (!provider || provider.mode === 'unconfigured') {
+          // Most informative thing to show is "no agent wired" so the
+          // operator knows what's wrong without needing the logs.
+          $badges.appendChild(badge('No agent wired', 'unconfigured'));
+          return;
+        }
+
+        const modeLabel = provider.mode === 'local' ? 'Local' : 'Cloud';
+        const modelText = provider.model ? `${modeLabel} · ${provider.model}` : modeLabel;
+        $badges.appendChild(badge(modelText, provider.mode));
+
+        // Egress badges — only emitted in local mode. Cloud mode users
+        // already know egress is open from the "Cloud" label, so a "🔒"
+        // there is just visual clutter. Local mode is where the lockdown
+        // matters, so we surface both states explicitly:
+        //   - blocked → "🔒 Egress locked" (green, reassuring)
+        //   - open    → "⚠ Egress open" (warn, flags config drift)
+        // Without this warn, a user who picked Ollama but skipped
+        // blockedHosts would silently still be reachable to api.anthropic.
+        if (provider.mode === 'local') {
+          const hasBlocks = egress && Array.isArray(egress.blocked) && egress.blocked.length > 0;
+          if (hasBlocks) {
+            $badges.appendChild(badge('🔒 Egress locked', 'locked'));
+          } else {
+            $badges.appendChild(badge('⚠ Egress open', 'warn'));
+          }
+        }
+      }
+
+      function badge(text, kind) {
+        const span = document.createElement('span');
+        span.className = `badge ${kind || ''}`.trim();
+        span.textContent = text;
+        return span;
+      }
+
+      function clearEmpty() {
+        const empty = document.getElementById('empty');
+        if (empty) empty.remove();
+      }
+
+      function addMessage(text, who) {
+        clearEmpty();
+        const div = document.createElement('div');
+        div.className = `msg ${who}`;
+        div.textContent = text;
+        $messages.appendChild(div);
+        $messages.scrollTop = $messages.scrollHeight;
+      }
+
+      function addCard(question) {
+        clearEmpty();
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.questionId = question.questionId;
+
+        const title = document.createElement('div');
+        title.className = 'card-title';
+        title.textContent = question.title;
+        card.appendChild(title);
+
+        const body = document.createElement('div');
+        body.className = 'card-question';
+        body.textContent = question.question;
+        card.appendChild(body);
+
+        const opts = document.createElement('div');
+        opts.className = 'card-options';
+        question.options.forEach((opt, i) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          // First option (index 0) is the primary/affirmative — match
+          // chat-sdk-bridge's "Approve = primary, Reject = secondary"
+          // visual ordering. For non-approval ask_question with N options
+          // the first is treated as the primary choice.
+          if (i > 0) btn.classList.add('secondary');
+          btn.textContent = opt.label;
+          btn.addEventListener('click', () => submitAction(card, question, opt));
+          opts.appendChild(btn);
+        });
+        card.appendChild(opts);
+
+        $messages.appendChild(card);
+        $messages.scrollTop = $messages.scrollHeight;
+      }
+
+      async function submitAction(cardEl, question, option) {
+        // Optimistic update — disable buttons, replace card body with the
+        // selectedLabel — so there's no flash of clickable buttons before
+        // the next poll catches up. The server also rewrites the buffered
+        // entry so a tab reload sees the answered state.
+        const buttons = cardEl.querySelectorAll('button');
+        buttons.forEach((b) => (b.disabled = true));
+        cardEl.querySelector('.card-question').textContent = option.selectedLabel;
+        cardEl.querySelector('.card-options').remove();
+
+        try {
+          const res = await fetch('/api/actions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questionId: question.questionId, value: option.value }),
+          });
+          if (!res.ok) {
+            const body = await res.text();
+            cardEl.querySelector('.card-question').textContent =
+              `[error: ${res.status} ${body}]`;
+          }
+        } catch (err) {
+          cardEl.querySelector('.card-question').textContent =
+            `[network error: ${err.message}]`;
+        }
+      }
+
+      async function poll() {
+        try {
+          const res = await fetch(`/api/messages?since=${cursor}`, { cache: 'no-store' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          setOnline(true);
+          for (const m of data.messages || []) {
+            if (m.kind === 'question') {
+              // Skip if we've already rendered this question id (e.g. it's
+              // re-arriving after a polling race with the action submit).
+              if (document.querySelector(`[data-question-id="${m.questionId}"]`)) continue;
+              addCard(m);
+            } else {
+              addMessage(m.text, 'agent');
+            }
+          }
+          if (typeof data.cursor === 'number') cursor = data.cursor;
+        } catch (err) {
+          setOnline(false);
+        }
+      }
+
+      async function send(text) {
+        $send.disabled = true;
+        try {
+          const res = await fetch('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }),
+          });
+          if (!res.ok) {
+            const body = await res.text();
+            addMessage(`[error: ${res.status} ${body}]`, 'agent');
+            return false;
+          }
+          return true;
+        } catch (err) {
+          addMessage(`[network error: ${err.message}]`, 'agent');
+          return false;
+        } finally {
+          $send.disabled = false;
+        }
+      }
+
+      $form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = $input.value.trim();
+        if (!text) return;
+        addMessage(text, 'you');
+        $input.value = '';
+        autoResize();
+        await send(text);
+      });
+
+      $input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          $form.requestSubmit();
+        }
+      });
+
+      function autoResize() {
+        $input.style.height = 'auto';
+        $input.style.height = Math.min($input.scrollHeight, 160) + 'px';
+      }
+      $input.addEventListener('input', autoResize);
+
+      // Kick off the poll loop. 1s is fine for human-perceived "instant" —
+      // upgrade to SSE later if needed.
+      poll();
+      setInterval(poll, 1000);
+    </script>
+  </body>
+</html>

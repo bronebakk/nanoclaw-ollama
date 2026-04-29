@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NanoClaw</title>
+    <style>
+      :root {
+        --bg: #f7f7f8;
+        --panel: #ffffff;
+        --border: #e5e5e7;
+        --text: #1a1a1a;
+        --muted: #6b7280;
+        --accent: #2563eb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #18181b;
+          --panel: #1f1f23;
+          --border: #2e2e35;
+          --text: #ececec;
+          --muted: #9ca3af;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+        height: 100vh;
+        text-align: center;
+        padding: 24px;
+      }
+      .panel {
+        max-width: 360px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }
+      h1 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .spinner {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 3px solid var(--border);
+        border-top-color: var(--accent);
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .hint {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 0;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        padding: 1px 6px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <div class="spinner" aria-hidden="true"></div>
+      <h1>Connecting to NanoClaw…</h1>
+      <p class="hint">
+        Make sure the NanoClaw service is running. The window will open
+        automatically once the host responds at <code>127.0.0.1:3030</code>.
+      </p>
+    </div>
+    <script>
+      const HOST = 'http://127.0.0.1:3030';
+
+      // no-cors keeps this working without the host emitting CORS headers.
+      // We can't read the response body, but if fetch resolves at all the
+      // host is reachable — that's enough to know we should redirect. A
+      // real network failure (port unbound, host crashed) rejects.
+      async function check() {
+        try {
+          await fetch(HOST + '/api/info', { mode: 'no-cors', cache: 'no-store' });
+          window.location.href = HOST;
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      (async () => {
+        // Try immediately, then poll every 2s. Don't expose a manual
+        // "retry" button — the auto-poll is the user-visible UX.
+        while (true) {
+          if (await check()) return;
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      })();
+    </script>
+  </body>
+</html>

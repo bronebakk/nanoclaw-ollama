@@ -39,3 +39,9 @@ groups/*
 .nanoclaw/
 
 agents-sdk-docs
+
+# Desktop wrapper (Tauri) — Rust build outputs and Tauri-generated artifacts.
+# Cargo.lock is intentionally NOT ignored — this is a binary crate, so the
+# lock file is committed for reproducible builds.
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
