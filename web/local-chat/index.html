@@ -44,14 +44,52 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        padding: 12px 16px;
+        padding: 10px 16px;
         background: var(--panel);
         border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
       }
       header h1 {
         font-size: 15px;
         font-weight: 600;
         margin: 0;
+      }
+      header .badges {
+        display: inline-flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      header .badge {
+        font-size: 11px;
+        font-weight: 500;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--agent-bg);
+        color: var(--agent-fg);
+        white-space: nowrap;
+      }
+      header .badge.local {
+        background: rgba(22, 163, 74, 0.15);
+        color: var(--status-ok);
+      }
+      header .badge.cloud {
+        background: rgba(37, 99, 235, 0.15);
+        color: var(--accent);
+      }
+      header .badge.locked {
+        background: rgba(22, 163, 74, 0.15);
+        color: var(--status-ok);
+      }
+      header .badge.unconfigured {
+        background: rgba(220, 38, 38, 0.15);
+        color: var(--status-bad);
+      }
+      header .badge.warn {
+        background: rgba(217, 119, 6, 0.15);
+        color: #d97706;
+      }
+      @media (prefers-color-scheme: dark) {
+        header .badge.warn { color: #fbbf24; }
       }
       header .status {
         display: inline-flex;
@@ -193,7 +231,8 @@
   </head>
   <body>
     <header>
-      <h1>NanoClaw</h1>
+      <h1 id="title">NanoClaw</h1>
+      <div class="badges" id="badges"></div>
       <span class="status">
         <span id="dot" class="dot"></span>
         <span id="status-text">connecting…</span>
@@ -226,6 +265,8 @@
       const $send = document.getElementById('send');
       const $dot = document.getElementById('dot');
       const $statusText = document.getElementById('status-text');
+      const $badges = document.getElementById('badges');
+      const $title = document.getElementById('title');
 
       let cursor = 0;
       let online = false;
@@ -235,6 +276,67 @@
         online = ok;
         $dot.classList.toggle('ok', ok);
         $statusText.textContent = ok ? 'connected' : 'offline';
+        // Refresh the badges on every reconnect — the operator may have
+        // re-run /add-ollama-provider or edited container.json while the
+        // SPA was offline.
+        if (ok) refreshInfo();
+      }
+
+      async function refreshInfo() {
+        try {
+          const res = await fetch('/api/info', { cache: 'no-store' });
+          if (!res.ok) return;
+          const info = await res.json();
+          renderBadges(info);
+        } catch {
+          // Non-fatal — leave the existing badges in place.
+        }
+      }
+
+      function renderBadges(info) {
+        $badges.innerHTML = '';
+        const provider = info.provider;
+        const egress = info.egress;
+        const agent = info.agent;
+
+        if (agent && agent.name) {
+          $title.textContent = agent.name;
+        }
+
+        if (!provider || provider.mode === 'unconfigured') {
+          // Most informative thing to show is "no agent wired" so the
+          // operator knows what's wrong without needing the logs.
+          $badges.appendChild(badge('No agent wired', 'unconfigured'));
+          return;
+        }
+
+        const modeLabel = provider.mode === 'local' ? 'Local' : 'Cloud';
+        const modelText = provider.model ? `${modeLabel} · ${provider.model}` : modeLabel;
+        $badges.appendChild(badge(modelText, provider.mode));
+
+        // Egress badges — only emitted in local mode. Cloud mode users
+        // already know egress is open from the "Cloud" label, so a "🔒"
+        // there is just visual clutter. Local mode is where the lockdown
+        // matters, so we surface both states explicitly:
+        //   - blocked → "🔒 Egress locked" (green, reassuring)
+        //   - open    → "⚠ Egress open" (warn, flags config drift)
+        // Without this warn, a user who picked Ollama but skipped
+        // blockedHosts would silently still be reachable to api.anthropic.
+        if (provider.mode === 'local') {
+          const hasBlocks = egress && Array.isArray(egress.blocked) && egress.blocked.length > 0;
+          if (hasBlocks) {
+            $badges.appendChild(badge('🔒 Egress locked', 'locked'));
+          } else {
+            $badges.appendChild(badge('⚠ Egress open', 'warn'));
+          }
+        }
+      }
+
+      function badge(text, kind) {
+        const span = document.createElement('span');
+        span.className = `badge ${kind || ''}`.trim();
+        span.textContent = text;
+        return span;
       }
 
       function clearEmpty() {

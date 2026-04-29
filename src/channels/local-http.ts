@@ -35,6 +35,9 @@ import fs from 'fs';
 import http from 'http';
 import path from 'path';
 
+import { DATA_DIR, GROUPS_DIR } from '../config.js';
+import { getAgentGroup } from '../db/agent-groups.js';
+import { getMessagingGroupAgents, getMessagingGroupByPlatform } from '../db/messaging-groups.js';
 import { log } from '../log.js';
 import type { ChannelAdapter, ChannelSetup, OutboundMessage } from './adapter.js';
 import type { NormalizedOption } from './ask-question.js';
@@ -207,7 +210,12 @@ async function handleRequest(
       return handleGetMessages(url, res, outbound);
     }
     if (method === 'GET' && url.pathname === '/api/info') {
-      return sendJson(res, 200, { channelType: CHANNEL_TYPE, platformId: PLATFORM_ID, ready: true });
+      return sendJson(res, 200, {
+        channelType: CHANNEL_TYPE,
+        platformId: PLATFORM_ID,
+        ready: true,
+        ...readChannelStatus(),
+      });
     }
     if (method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       return serveStatic(res, 'index.html', 'text/html; charset=utf-8');
@@ -397,6 +405,89 @@ function extractText(message: OutboundMessage): string | null {
     return content.text;
   }
   return null;
+}
+
+/**
+ * Per-request snapshot of which agent group is wired to this channel and how
+ * its inference is configured. Drives the SPA's mode/egress badges so the
+ * end user can see at a glance whether their conversation is staying local.
+ *
+ * Resolution is best-effort and tolerant — every field is independently
+ * nullable. A fresh install with no wiring returns all-null and the SPA
+ * shows the channel header without badges.
+ */
+interface ChannelStatus {
+  agent: { id: string; name: string; folder: string } | null;
+  provider: { mode: 'local' | 'cloud' | 'unconfigured'; baseUrl: string | null; model: string | null };
+  egress: { blocked: string[] };
+}
+
+function readChannelStatus(): ChannelStatus {
+  const fallback: ChannelStatus = {
+    agent: null,
+    provider: { mode: 'unconfigured', baseUrl: null, model: null },
+    egress: { blocked: [] },
+  };
+  try {
+    const mg = getMessagingGroupByPlatform(CHANNEL_TYPE, PLATFORM_ID);
+    if (!mg) return fallback;
+
+    // Multiple wirings are technically possible (e.g. operator wired both
+    // a chat AG and a separate approval-only AG). Pick the highest-priority
+    // one — same tiebreak getMessagingGroupAgents uses for routing.
+    const wirings = getMessagingGroupAgents(mg.id);
+    if (wirings.length === 0) return fallback;
+    const ag = getAgentGroup(wirings[0]!.agent_group_id);
+    if (!ag) return fallback;
+
+    const containerJson = readJsonSafe(path.join(GROUPS_DIR, ag.folder, 'container.json'));
+    const settingsJson = readJsonSafe(
+      path.join(DATA_DIR, 'v2-sessions', ag.id, '.claude-shared', 'settings.json'),
+    );
+
+    const env = (containerJson?.env ?? {}) as Record<string, unknown>;
+    const blockedHostsRaw = containerJson?.blockedHosts;
+    const blocked = Array.isArray(blockedHostsRaw)
+      ? blockedHostsRaw.filter((h): h is string => typeof h === 'string')
+      : [];
+
+    const baseUrl = typeof env.ANTHROPIC_BASE_URL === 'string' ? env.ANTHROPIC_BASE_URL : null;
+    const model = typeof settingsJson?.model === 'string' ? settingsJson.model : null;
+
+    let mode: ChannelStatus['provider']['mode'];
+    if (baseUrl && isLocalUrl(baseUrl)) mode = 'local';
+    else mode = 'cloud';
+
+    return {
+      agent: { id: ag.id, name: ag.name, folder: ag.folder },
+      provider: { mode, baseUrl, model },
+      egress: { blocked },
+    };
+  } catch (err) {
+    log.warn('local-http: readChannelStatus failed (returning fallback)', { err });
+    return fallback;
+  }
+}
+
+function readJsonSafe(p: string): Record<string, unknown> | null {
+  try {
+    if (!fs.existsSync(p)) return null;
+    const raw = fs.readFileSync(p, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function isLocalUrl(url: string): boolean {
+  // host.docker.internal is the canonical pattern (per docs/ollama.md);
+  // 127.0.0.1 / localhost / 0.0.0.0 catch alternative configurations like
+  // running Ollama in the same network namespace as the container.
+  return /^https?:\/\/(host\.docker\.internal|127\.0\.0\.1|localhost|0\.0\.0\.0)(:|\/|$)/i.test(url);
 }
 
 function extractAskQuestion(message: OutboundMessage): AskQuestionContent | null {
