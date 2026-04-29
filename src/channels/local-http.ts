@@ -441,9 +441,7 @@ function readChannelStatus(): ChannelStatus {
     if (!ag) return fallback;
 
     const containerJson = readJsonSafe(path.join(GROUPS_DIR, ag.folder, 'container.json'));
-    const settingsJson = readJsonSafe(
-      path.join(DATA_DIR, 'v2-sessions', ag.id, '.claude-shared', 'settings.json'),
-    );
+    const settingsJson = readJsonSafe(path.join(DATA_DIR, 'v2-sessions', ag.id, '.claude-shared', 'settings.json'));
 
     const env = (containerJson?.env ?? {}) as Record<string, unknown>;
     const blockedHostsRaw = containerJson?.blockedHosts;
