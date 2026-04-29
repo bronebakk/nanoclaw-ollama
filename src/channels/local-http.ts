@@ -98,9 +98,7 @@ function createAdapter(): ChannelAdapter {
    * The original seq is dropped from the buffer (single-writer; safe).
    */
   function resolveQuestion(questionId: string, selectedLabel: string): boolean {
-    const idx = outbound.findIndex(
-      (m) => m.kind === 'question' && m.questionId === questionId,
-    );
+    const idx = outbound.findIndex((m) => m.kind === 'question' && m.questionId === questionId);
     if (idx < 0) return false;
     const original = outbound[idx] as BufferedQuestion;
     outbound.splice(idx, 1);
