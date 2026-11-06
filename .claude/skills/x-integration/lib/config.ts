@@ -49,8 +49,6 @@ export const config = {
   // Chrome launch arguments
   chromeArgs: [
     '--disable-blink-features=AutomationControlled',
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-sync',
