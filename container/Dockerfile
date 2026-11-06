@@ -20,7 +20,7 @@ ARG INSTALL_CJK_FONTS=false
 # mean every rebuild silently picks up the latest and can break in lockstep
 # across all users.
 ARG CLAUDE_CODE_VERSION=2.1.116
-ARG AGENT_BROWSER_VERSION=latest
+ARG AGENT_BROWSER_VERSION=0.41.2
 ARG VERCEL_VERSION=latest
 ARG BUN_VERSION=1.3.12
 
